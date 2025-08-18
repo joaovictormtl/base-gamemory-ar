@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>AR/VR Lógica e Jogo da Memória</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+    <style>
+        .ui-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 18px;
+            text-align: center;
+            z-index: 999;
+        }
+        
+        .instructions {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background-color: rgba(255, 255, 255, 0.8);
+            color: black;
+            padding: 15px;
+            border-radius: 10px;
+            max-width: 80%;
+            font-size: 16px;
+            line-height: 1.4;
+            z-index: 999;
+            border: 3px solid #4CAF50;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            margin: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #4CAF50;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            position: fixed;
+            bottom: 50%;
+            left: 10%;
+            width: 80%;
+            background-color: rgba(244, 67, 54, 0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 9999;
+        }
+
+        .mode-toggle {
+            position: fixed;
+            top: 50px;
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+            z-index: 999;
+        }
+
+        .mode-toggle button {
+            margin-bottom: 10px;
+            background-color: #673AB7;
+            border: 2px solid white;
+            padding: 10px;
+            font-weight: bold;
+        }
+
+        .mode-toggle button.active {
+            background-color: #4CAF50;
+            border: 2px solid yellow;
+        }
+
+        .vr-instructions {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 1000;
+            max-width: 80%;
+        }
+
+        .memory-game-instructions {
+            position: fixed;
+            bottom: 80px;
+            left: 20px;
+            background-color: rgba(156, 39, 176, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            max-width: 80%;
+            font-size: 16px;
+            line-height: 1.4;
+            z-index: 999;
+            border: 3px solid #9C27B0;
+        }
+        
+        .game-status {
+            position: fixed;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 16px;
+            z-index: 999;
+        }
+        
+        .mode-selector {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            z-index: 1000;
+        }
+        
+        .mode-selector button {
+            background-color: #673AB7;
+            margin: 0 5px;
+        }
+        
+        .mode-selector button.active {
+            background-color: #4CAF50;
+        }
+    </style>
+</head>
+<body style="margin: 0; overflow: hidden;">
+    <div id="loadingScreen" class="loading-screen">
+        <div class="spinner"></div>
+        <p>Carregando AR... Por favor aguarde.</p>
+        <p>Certifique-se de permitir acesso à câmera.</p>
+    </div>
+
+    <div id="errorMessage" class="error-message hidden">
+        <h3>Ocorreu um erro</h3>
+        <p id="errorText">Não foi possível iniciar a experiência AR.</p>
+        <button onclick="location.reload()">Tentar novamente</button>
+    </div>
+
+    <div class="ui-overlay">
+        <div id="topInfo">AR Lógica de Programação - Aponte a câmera para os marcadores</div>
+    </div>
+    
+    <div id="ifElseInstructions" class="instructions">
+        <h3>Estrutura IF/ELSE</h3>
+        <p>Este é um exemplo de como funciona uma decisão no código:</p>
+        <p><strong>Se</strong> (condição) { faça isso } <strong>Senão</strong> { faça aquilo }</p>
+        <p>Aponte para o marcador "hiro" para ver o exemplo!</p>
+        <button onclick="nextLesson()">Próxima Lição: FOR</button>
+    </div>
+    
+    <div id="forLoopInstructions" class="instructions hidden">
+        <h3>Estrutura FOR</h3>
+        <p>Um laço FOR repete uma ação várias vezes:</p>
+        <p><strong>Para</strong> (início; condição; incremento) { ação repetida }</p>
+        <p>Aponte para o marcador "kanji" para ver o exemplo!</p>
+        <button onclick="previousLesson()">Voltar para IF/ELSE</button>
+    </div>
+
+    <div class="mode-toggle">
+        <button id="ar-mode-btn" class="active" onclick="switchToARMode()">Modo AR</button>
+        <button id="vr-mode-btn" onclick="switchToVRMode()">Modo VR</button>
+    </div>
+
+    <div id="vr-instructions" class="vr-instructions hidden">
+        <h3>Instruções para VR</h3>
+        <p>Coloque seu celular no óculos VR e explore o ambiente virtual.</p>
+        <p>Use o olhar para interagir com os elementos.</p>
+        <button onclick="hideVRInstructions()">OK, Entendi!</button>
+    </div>
+
+    <div class="mode-selector">
+        <button id="logic-mode-btn" class="active" onclick="switchToLogicMode()">Lógica</button>
+        <button id="memory-game-btn" onclick="switchToMemoryGame()">Jogo da Memória</button>
+    </div>
+    
+    <div id="gameStatus" class="game-status hidden">
+        Combinações: <span id="matchCount">0</span>/4 | Tentativas: <span id="attempts">0</span>
+    </div>
+    
+    <div id="memoryGameInstructions" class="memory-game-instructions hidden">
+        <h3>Jogo da Memória</h3>
+        <p>Encontre os pares combinando os símbolos iguais.</p>
+        <p>Em AR: Aponte para os marcadores "a", "b", "c" e assim por diante.</p>
+        <p>Em VR: Use o olhar para selecionar as cartas e encontrar os pares.</p>
+        <button onclick="resetMemoryGame()">Reiniciar Jogo</button>
+    </div>
+
+    <a-scene id="scene" embedded arjs="sourceType: webcam; detectionMode: mono_and_matrix; matrixCodeType: 3x3; debugUIEnabled: false;" 
+             vr-mode-ui="enabled: false" 
+             renderer="logarithmicDepthBuffer: true; precision: mediump;" 
+             loading-screen="enabled: false">
+        
+        <!-- Configurações para modo VR -->
+        <a-entity id="vr-camera-rig" position="0 0 0" rotation="0 0 0" visible="false">
+            <a-entity id="vr-camera" camera look-controls wasd-controls position="0 1.6 0">
+                <a-entity cursor="fuse: true; fuseTimeout: 500"
+                          position="0 0 -1"
+                          geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+                          material="color: #4CAF50; shader: flat"
+                          raycaster="objects: .clickable; far: 20">
+                </a-entity>
+            </a-entity>
+        </a-entity>
+
+        <!-- Ambiente virtual para modo VR -->
+        <a-entity id="vr-world" visible="false">
+            <a-sky color="#ECECEC"></a-sky>
+            <a-plane position="0 0 0" rotation="-90 0 0" width="20" height="20" color="#7BC8A4"></a-plane>
+            
+            <!-- IF/ELSE em VR -->
+            <a-entity position="-2 0 -3">
+                <a-box position="0 0.1 0" depth="1" height="0.1" width="2" color="#9c9c9c"></a-box>
+                <a-box position="-0.7 0.5 0" depth="0.4" height="0.4" width="0.4" color="#FF5722"
+                       animation__rotate="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear">
+                    <a-text value="condição" position="0 0.3 0" rotation="-90 0 0" align="center" color="white" scale="0.5 0.5 0.5"></a-text>
+                </a-box>
+                <a-text value="Estrutura IF/ELSE" position="0 1 0" scale="0.5 0.5 0.5" color="#000" align="center"></a-text>
+            </a-entity>
+            
+            <!-- FOR Loop em VR -->
+            <a-entity position="2 0 -3">
+                <a-box position="0 0.1 0" depth="1.5" height="0.1" width="1.5" color="#9c9c9c"></a-box>
+                <a-box position="-0.5 0.4 0" depth="0.3" height="0.3" width="0.3" color="#2196F3">
+                    <a-text value="i = 0" position="0 0.2 0" rotation="-90 0 0" align="center" color="white" scale="0.4 0.4 0.4"></a-text>
+                </a-box>
+                <a-text value="Estrutura FOR" position="0 1 0" scale="0.5 0.5 0.5" color="#000" align="center"></a-text>
+            </a-entity>
+
+            <!-- Jogo da Memória em VR -->
+            <a-entity id="memory-game-vr" position="0 0.1 -3" rotation="0 0 0" visible="false">
+                <a-text value="JOGO DA MEMÓRIA" position="0 1.5 0" color="#9C27B0" align="center" scale="0.8 0.8 0.8"></a-text>
+                
+                <!-- Linha 1 de cartas -->
+                <a-entity position="-1.5 0 0">
+                    <a-box class="memory-card clickable" position="0 0.1 0" width="0.8" height="0.1" depth="0.8" color="#9C27B0" 
+                          memory-card="symbol: star" onclick="flipCardVR(this)">
+                        <a-entity class="card-back" position="0 0.1 0" visible="true">
+                            <a-plane position="0 0 0" rotation="-90 0 0" width="0.8" height="0.8" color="#9C27B0"></a-plane>
+                            <a-text value="?" position="0 0.01 0" rotation="-90 0 0" align="center" color="white" scale="0.5 0.5 0.5"></a-text>
+                        </a-entity>
+                        <a-entity class="card-front" position="0 0.1 0" visible="false">
+                            <a-plane position="0 0 0" rotation="-90 0 0" width="0.8" height="0.8" color="#E1BEE7"></a-plane>
+                            <a-entity position="0 0.1 0" geometry="primitive: star; radius: 0.3" material="color: gold" rotation="-90 0 0"></a-entity>
+                        </a-entity>
+                    </a-box>
+                </a-entity>
+                
+                <a-entity position="-0.5 0 0">
+                    <a-box class="memory-card clickable" position="0 0.1 0" width="0.8" height="0.1" depth="0.8" color="#9C27B0" 
+                          memory-card="symbol: sphere" onclick="flipCardVR(this)"></a-box>
+                        <a-entity class="card-back" position="0 0.1 0" visible="true">
+                            <a-plane position="0 0 0" rotation="-90 0 0" width="0.8" height="0.8" color="#9C27B0"></a-plane>
+                            <a-text value="?" position="0 0.01 0" rotation="-90 0 0" align="center" color="white" scale="0.5 0.5 0.5"></a-text>
+                        </a-entity>
+                        <a-entity class="card-front" position="0 0.1 0" visible="false">
+                            <a-plane position="0 0 0" rotation="-90 0 0" width="0.8" height="0.8" color="#E1BEE7"></a-plane>
+                            <a-sphere position="0 0.1 0" radius="0.3" color="red"></a-sphere>
+                        </a-entity>
+                    </a-box>
+                </a-entity>
+                
+                <a-entity position="0.5 0 0">
+                    <a-box class="memory-card clickable" position="0 0.1 0" width="0.8" height="0.1" depth="0.8" color="#9C27B0" 
+                          memory-card="symbol: cube" onclick="flipCardVR(this)">
+                        <a-entity class="card-back" position="0 0.1 0" visible="true">
+                            <a-plane position="0 0 0" rotation="-90 0 0" width="0.8" height="0.8" color="#9C27B0"></a-plane>
+                            <a-text value="?" position="0 0.01 0" rotation="-90 0 0" align="center" color="white" scale="0.5 0.5 0.5"></a-text>
+                        </a-entity>
+                        <a-entity class="card-front" position="0 0.1 0" visible="false">
+                            <a-plane position="0 0 0" rotation="-90 0 0" width="0.8" height="0.8" color="#E1BEE7"></a-plane>
+                            <a-box position="0 0.1 0" width="0.3" height="0.3" depth="0.3" color="blue" rotation="-90 0 0"></a-box>
+                        </a-entity>
+                    </a-box>
+                </a-entity>
+                
+                <a-entity position="1.5 0 0">
+                    <a-box class="memory-card clickable" position="0 0.1 0" width="0.8" height="0.1" depth="0.8" color="#9C27B0" 
+                          memory-card="symbol: star" onclick="flipCardVR(this)">
+                        <a-entity class="card-back" position="0 0.1 0" visible="true">
+                            <a-plane position="0 0 0" rotation="-90 0 0" width="0.8" height="0.8" color="#9C27B0"></a-plane>
+            document.getElementById('ar-camera').setAttribute('active', 'true');
+            document.getElementById('ar-camera').setAttribute('camera', 'active', true);
+            document.getElementById('vr-camera').setAttribute('camera', 'active', false);
+        }
+        
+        // Função para alternar para o modo VR
+        function switchToVRMode() {
+            currentMode = 'vr';
+            
+            // Atualize os botões
+            document.getElementById('ar-mode-btn').classList.remove('active');
+            document.getElementById('vr-mode-btn').classList.add('active');
+            
+            // Atualize as instruções
+            document.getElementById('ifElseInstructions').classList.add('hidden');
+            document.getElementById('forLoopInstructions').classList.add('hidden');
+            document.getElementById('vr-instructions').classList.remove('hidden');
+            document.getElementById('topInfo').innerText = "VR Lógica de Programação - Use o headset VR para explorar";
+            
+            // Configure a cena
+            const scene = document.querySelector('a-scene');
+            
+            // Desative componentes AR
+            scene.removeAttribute('arjs');
+            scene.setAttribute('vr-mode-ui', 'enabled: true');
+            
+            // Mostre o ambiente VR
+            document.getElementById('vr-world').setAttribute('visible', 'true');
+            document.getElementById('vr-camera-rig').setAttribute('visible', 'true');
+            
+            // Ative a câmera VR
+            document.getElementById('ar-camera').setAttribute('active', 'false');
+            document.getElementById('vr-camera').setAttribute('camera', 'active', true);
+            document.getElementById('ar-camera').setAttribute('camera', 'active', false);
+        }
+        
+        function hideVRInstructions() {
+            document.getElementById('vr-instructions').classList.add('hidden');
+        }
+
+        // Verificar compatibilidade com AR
+        document.addEventListener("DOMContentLoaded", function() {
+            // Esconder tela de loading após 5 segundos (tempo para carregar)
+            setTimeout(function() {
+                document.getElementById('loadingScreen').classList.add('hidden');
+            }, 5000);
+            
+            // Verificar se está em um dispositivo móvel
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            if (!isMobile) {
+                showError("Esta experiência AR funciona melhor em dispositivos móveis.");
+            }
+        });
+        
+        // Detectar erros de inicialização de AR
+        window.addEventListener('camera-error', function() {
+            showError("Não foi possível acessar a câmera. Verifique as permissões.");
+        });
+        
+        function showError(message) {
+            document.getElementById('loadingScreen').classList.add('hidden');
+            document.getElementById('errorText').innerText = message;
+            document.getElementById('errorMessage').classList.remove('hidden');
+        }
+
+        function nextLesson() {
+            document.getElementById('ifElseInstructions').classList.add('hidden');
+            document.getElementById('forLoopInstructions').classList.remove('hidden');
+            document.getElementById('topInfo').innerText = "AR Lógica - Laços de Repetição FOR";
+        }
+        
+        function previousLesson() {
+            document.getElementById('forLoopInstructions').classList.add('hidden');
+            document.getElementById('ifElseInstructions').classList.remove('hidden');
+            document.getElementById('topInfo').innerText = "AR Lógica - Estruturas de Decisão IF/ELSE";
+        }
+
+        // Detectar quando um marcador é encontrado
+        document.querySelector("#hiro-marker").addEventListener('markerFound', function() {
+            if (currentMode === 'ar') {
+                document.getElementById('ifElseInstructions').classList.remove('hidden');
+                document.getElementById('forLoopInstructions').classList.add('hidden');
+                document.getElementById('topInfo').innerText = "Estrutura IF/ELSE encontrada!";
+            }
+        });
+
+        document.querySelector("#kanji-marker").addEventListener('markerFound', function() {
+            if (currentMode === 'ar') {
+                document.getElementById('forLoopInstructions').classList.remove('hidden');
+                document.getElementById('ifElseInstructions').classList.add('hidden');
+                document.getElementById('topInfo').innerText = "Estrutura FOR encontrada!";
+            }
+        });
+
+        // Detectar quando um marcador é perdido
+        document.querySelector("#hiro-marker").addEventListener('markerLost', function() {
+            // Opcional: Você pode adicionar código aqui para lidar com a perda do marcador
+        });
+        
+        document.querySelector("#kanji-marker").addEventListener('markerLost', function() {
+            // Opcional: Você pode adicionar código aqui para lidar com a perda do marcador
+        });
+
+        // Animações e interações adicionais podem ser implementadas aqui
+        AFRAME.registerComponent('animate-loop', {
+            init: function() {
+                const el = this.el;
+                let index = 0;
+                
+                setInterval(() => {
+                    // Simulação de execução do loop
+                    index = (index + 1) % 3;
+                    // Atualizar a posição do ponteiro
+                    el.setAttribute('position', {x: -0.4 + (index * 0.4), y: 0.4, z: 0});
+                }, 1000);
+            }
+        });
+    </script>
+</body>
+</html>
